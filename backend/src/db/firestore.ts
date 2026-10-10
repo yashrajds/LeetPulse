@@ -148,12 +148,16 @@ export class FirestoreStore implements Store {
     return q.docs.map((d) => toChallenge(d.id, d.data()));
   }
 
+  // NOTE: equality-only queries + client-side sort need no composite indexes,
+  // so the app works on a fresh Firestore project with zero console setup.
+  // firebase/firestore.indexes.json remains as an optional server-side optimization.
   async getSolution(challengeId: number | string, language: string): Promise<Solution | null> {
-    const q = await db().collection('solutions')
-      .where('challengeId', '==', String(challengeId))
-      .where('language', '==', language)
-      .orderBy('createdAt', 'desc').limit(1).get();
-    return q.empty ? null : toSolution(q.docs[0].id, q.docs[0].data());
+    const q = await db().collection('solutions').where('challengeId', '==', String(challengeId)).get();
+    const rows = q.docs
+      .map((d) => toSolution(d.id, d.data()))
+      .filter((s) => s.language === language)
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    return rows[0] ?? null;
   }
 
   async getSolutionById(id: number | string): Promise<Solution | null> {
@@ -170,10 +174,10 @@ export class FirestoreStore implements Store {
   async listSolutionsByDate(date: string, language?: string): Promise<Solution[]> {
     const ch = await this.getChallengeByDate(date);
     if (!ch) return [];
-    const q = await db().collection('solutions')
-      .where('challengeId', '==', String(ch.id))
-      .orderBy('createdAt', 'desc').get();
-    let rows = q.docs.map((d) => toSolution(d.id, d.data()));
+    const q = await db().collection('solutions').where('challengeId', '==', String(ch.id)).get();
+    let rows = q.docs
+      .map((d) => toSolution(d.id, d.data()))
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
     if (language) rows = rows.filter((s) => s.language === language);
     return rows;
   }
@@ -232,10 +236,10 @@ export class FirestoreStore implements Store {
   }
 
   async listSubmissionsBySolution(solutionId: number | string): Promise<Submission[]> {
-    const q = await db().collection('submissions')
-      .where('solutionId', '==', String(solutionId))
-      .orderBy('createdAt', 'desc').get();
-    return q.docs.map((d) => toSubmission(d.id, d.data()));
+    const q = await db().collection('submissions').where('solutionId', '==', String(solutionId)).get();
+    return q.docs
+      .map((d) => toSubmission(d.id, d.data()))
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   }
 
   async countSubmissions(status: string): Promise<number> {

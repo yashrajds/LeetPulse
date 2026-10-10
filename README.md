@@ -159,8 +159,14 @@ All errors: `{ "error": { "code": "...", "message": "..." } }`.
   `Store` interface, so swapping needs no code changes:
   1. Create a project at [console.firebase.google.com](https://console.firebase.google.com)
      (your GitHub-login Google account works), enable **Firestore Database**.
-  2. Deploy rules + indexes: `firebase deploy --only firestore` from `firebase/`
-     (or paste `firebase/firestore.rules` in the console Rules tab).
+  2. Rules (recommended): Firestore Database → Rules tab → paste
+     `firebase/firestore.rules` → Publish. (Fresh databases already deny client
+     access by default, which is all the app needs — the backend Admin SDK
+     bypasses rules and the frontend never touches Firestore directly.)
+  3. Indexes (optional optimization): the app is written to work with only
+     Firestore's automatic single-field indexes, so this step can be skipped.
+     To push sorting/filtering server-side, deploy `firebase/firestore.indexes.json`
+     via `firebase deploy --only firestore` from `firebase/`.
   3. Generate a service account key: Project Settings → Service accounts →
      Generate new private key. Set `GOOGLE_APPLICATION_CREDENTIALS` to its path
      (server only — never commit it), and `DB_PROVIDER=firestore`.
