@@ -1,0 +1,11 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Backend-only access: the API server uses the Firebase Admin SDK,
+    // which bypasses these rules. No browser/client access is granted.
+    // (The LeetPulse frontend talks to the Express API, never to Firestore directly.)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
