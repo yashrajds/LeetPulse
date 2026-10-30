@@ -3,7 +3,7 @@ name: GitPulse daily commit
 
 on:
   schedule:
-    - cron: "30 3 * * *"
+    - cron: "30 3-15 * * *"
   workflow_dispatch:
 
 permissions:
@@ -17,17 +17,38 @@ jobs:
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
-      - name: Create daily pulse
+      - name: Create daily pulse at a random time
         env:
           AUTHOR_NAME: WWFzaHJhaiBEZXNobXVraA==
           AUTHOR_EMAIL: MTEyODA2NDA1K3lhc2hyYWpkc0B1c2Vycy5ub3JlcGx5LmdpdGh1Yi5jb20=
           REPOSITORY: eWFzaHJhamRzL0xlZXRQdWxzZQ==
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           git config user.name "$(printf '%s' "$AUTHOR_NAME" | base64 --decode)"
           git config user.email "$(printf '%s' "$AUTHOR_EMAIL" | base64 --decode)"
           repo="$(printf '%s' "$REPOSITORY" | base64 --decode)"
+          today="$(date -u '+%F')"
+          marker=".gitpulse/last-scheduled-date.txt"
+          if [ "$EVENT_NAME" = "schedule" ]; then
+            last_date="$(cat "$marker" 2>/dev/null || true)"
+            if [ "$last_date" = "$today" ]; then
+              echo "Today's scheduled pulse already ran."
+              exit 0
+            fi
+            hash="$(printf '%s' "$today:$repo" | sha256sum | cut -c1-8)"
+            target_hour=$((16#$hash % 13 + 3))
+            current_hour="$(date -u '+%-H')"
+            if [ "$current_hour" -lt "$target_hour" ]; then
+              echo "Waiting for this repository's randomly assigned hour."
+              exit 0
+            fi
+          fi
           mkdir -p .gitpulse
           printf '%s | %s\n' "$(date -u '+%Y-%m-%d %H:%M UTC')" "$repo" >> .gitpulse/pulse.log
+          if [ "$EVENT_NAME" = "schedule" ]; then
+            printf '%s\n' "$today" > "$marker"
+            git add "$marker"
+          fi
           git add .gitpulse/pulse.log
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "chore(pulse): automated repository sync"
